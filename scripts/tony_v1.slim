@@ -1,0 +1,533 @@
+initialize() {
+	// SEED1 is used to start the simulation, through the end of burn-in.  SEED2 is set at the
+	// end of burn-in, allowing replicate runs to use the same burn-in state.  They can be set
+	// at the command line with SLiM's command-line option -D.
+	if (!exists("SEED1"))
+		defineConstant("SEED1", 1);
+	if (!exists("SEED2"))
+		defineConstant("SEED2", 2);
+	if (!exists("N_snps"))
+		defineConstant("N_snps", 100);		// number of causal SNPs per lineage, initially  with new code seems to be N_snps * N_founders total mutations
+	if (!exists("SCALE"))
+		defineConstant("SCALE", 100);		// rescaling down of population sizes for speed, 100 is 1/100 default sizes
+	if (!exists("mydirIndicator"))
+		defineConstant("mydirIndicator",1);
+		
+	setSeed(SEED1);
+	catn("SETTING SEED1: " + SEED1);
+	catn();
+	
+	mydir="runs/run_" + mydirIndicator;
+	setwd(mydir);
+	
+	defineConstant("WEEKS", 12);   //number of weeks to carry out selection experiment
+	defineConstant("N_founders", 18);	// number of founder lineages
+	defineConstant("K0", c(50,50,30,30,30,20,20,20,20,15,15,15,15,10,10,5,5,2));    // weight number of founders contributing to F1
+	defineConstant("K1", integerDiv(1e6, SCALE));	// carrying capacity 1, every Monday start
+	defineConstant("K2", integerDiv(1e7, SCALE));	// carrying capacity 2, every Tu/W/Th start
+	defineConstant("K3", integerDiv(1e9, SCALE));	// carrying capacity 3, every Tu/W/Th end
+	defineConstant("F1", (K2/K1)^(1/5)); // mean fecundity on Mondays; K1 to K2 in 5 generations
+	defineConstant("F2", (K3/K2)^(1/10)); // mean fecundity on TuWTh; K2 to K3 in 10 generations
+	defineConstant("L", 500e3);            // chromosome length in basepair
+	defineConstant("EFFECTSCALER", 2.0);            // effect sizes are scaled by 1/freq^EFFECTSCALER ... bigger numbers make common alleles less important
+
+	defineConstant("BLOCK", 1000);			//size of blocks marked with founder allele
+
+	catn("SCALE == " + SCALE);
+	catn("K0 == " + paste(K0, sep=","));
+	catn("K1 == " + K1);
+	catn("K2 == " + K2);
+	catn("K3 == " + K3);
+	catn();
+	
+	initializeSLiMModelType("nonWF");
+	
+	// m1 is neutral
+	initializeMutationType("m1", 0.5, "f", 0.0);
+	m1.convertToSubstitution = F;
+	
+	// m2 is additive QTLs determining phenotype
+	initializeMutationType("m2", 0.0, "n", 0.0, 1.0);
+	m2.haploidDominanceCoeff = 0.0;	// not used
+	
+	initializeGenomicElementType("g1", m1, 1.0);
+	initializeGenomicElement(g1, 0, L-1);
+	initializeMutationRate(0.0);
+	initializeRecombinationRate(4.0/L);		// 4 crossovers per haploid gamete
+}
+fitness(m2) { return 1.0; }
+
+first() {
+	// The timing of this model is complicated, so here we figure out what we
+	// will do this tick and set things up according to that plan.
+	t = community.tick;
+	cat("tick " + t + ": ");
+	
+	// deactivate all our optional blocks; we will activate what we want below
+	s0.active = 0;
+	s1.active = 0;
+	s2.active = 0;
+	s3.active = 0;
+	s10.active = 0;
+	s11.active = 0;
+	s12.active = 0;
+	s13.active = 0;
+	s100.active = 0;
+	s101.active = 0;
+	s200.active = 0;
+	
+	if (t == 1)
+	{
+		catn("founder setup");
+		defineGlobal("O_STAGE", "setup");
+		s10.active = 1;
+		s100.active = 1;
+	}
+	else
+	{
+		if (t <= 13)
+		{
+			cat("burn-in, generation " + (t - 1));
+			defineGlobal("O_STAGE", "burnin");
+			s0.active = 1;
+			s10.active = 1;  
+			if (t == 13)
+			{
+				s100.active = 1;
+				s101.active = 1;
+			}
+		}
+		else
+		{
+			week = integerDiv(t - 14, 36) + 1;
+			cat("WEEK " + week + ", ");
+			
+			t = integerMod(t - 14, 36);		// zero-base and modulo by weekly cycle of 36 stages
+			
+			if (t < 5)
+			{
+				// Monday is 5 generations of asexual exponential growth without selection
+				// It should start at K1 and end at K2
+				cat("MONDAY, generation " + t);
+				defineGlobal("O_STAGE", "monday");
+				s1.active = 1;
+				s10.active = 1;
+			}
+			else if (t < 15)
+			{
+				// Tuesday is 10 generations of asexual exponential growth with selection
+				// It should start at K2, end at K3, and then bottleneck down to K2
+				cat("TUESDAY, generation " + (t - 5));
+				defineGlobal("O_STAGE", "tuesday");
+				s2.active = 1;
+				if (t == 14)
+					s12.active = 1;
+				else
+					s11.active = 1;
+			}
+			else if (t < 25)
+			{
+				// Wednesday is 10 generations of asexual exponential growth with selection
+				// It should start at K2, end at K3, and then bottleneck down to K2
+				cat("WEDNESDAY, generation " + (t - 15));
+				defineGlobal("O_STAGE", "wednesday");
+				s2.active = 1;
+				if (t == 24)
+					s12.active = 1;
+				else
+					s11.active = 1;
+			}
+			else if (t < 35)
+			{
+				// Thursday is 10 generations of asexual exponential growth with selection
+				// It should start at K2, end at K3, and then bottleneck down to K1 (not K2)
+				cat("THURSDAY, generation " + (t - 25));
+				defineGlobal("O_STAGE", "thursday");
+				s2.active = 1;
+				if (t == 34)
+					s13.active = 1;
+				else
+					s11.active = 1;
+			}
+			else
+			{
+				// Friday is, in effect, a single generation of sexual mating without selection
+				// It should start at K1 and end at K1.  This process takes all weekend (Sat/Sun).
+				cat("FRIDAY");
+				defineGlobal("O_STAGE", "friday");
+				s3.active = 1;
+				s10.active = 1;
+				
+				if (week == WEEKS)
+				{
+					sim.simulationFinished();	// end at the end of this tick
+					s200.active = 1;
+					s100.active = 1;
+				}
+			}
+		}
+		
+		catn("; initial size " + p0.individualCount);
+		
+		if (s0.active) cat("   burn-in reproduction, ");
+		if (s1.active) cat("   Monday reproduction, ");
+		if (s2.active) cat("   TuWTh reproduction, ");
+		if (s3.active) cat("   Friday reproduction, ");
+		
+		if (s10.active) catn("no selection, no bottleneck");
+		if (s11.active) catn("selection, no bottleneck");
+		if (s12.active) catn("selection, K2 bottleneck (TuW)");
+		if (s13.active) catn("selection, K1 bottleneck (Th)");
+	}
+}
+
+s0 reproduction() /* 🔥👶 */ {
+	// sexual reproduction, exactly 1 offspring per parent
+	// for the burn-in; maintain constant population size
+	if (community.tick < 13)
+	{
+		for (i in seqLen(subpop.individualCount))
+			subpop.addCrossed(subpop.sampleIndividuals(1), subpop.sampleIndividuals(1));
+	}
+	else
+	{
+		for (i in seqLen(K1))
+			subpop.addCrossed(subpop.sampleIndividuals(1), subpop.sampleIndividuals(1));
+	}
+	self.active = 0;
+}
+s1 reproduction() /* M👶 */ {
+	// clonal reproduction, exponential growth
+	// for Mondays, starting at K1 and ending at K2 after 5 generations
+	fecundity = rpois(1, F1);
+	for (i in seqLen(fecundity))
+		subpop.addCloned(individual);
+}
+s2 reproduction() /* TuWTh👶 */ {
+	// clonal reproduction, exponential growth
+	// for TuWTh, starting at K2 and ending at K3 after 10 generations
+	fecundity = rpois(1, F2);
+	for (i in seqLen(fecundity))
+		subpop.addCloned(individual);
+}
+s3 reproduction() /* F👶 */ {
+	// sexual reproduction, exactly 1 offspring per parent
+	// for Fridays; maintain constant population size
+	subpop.addCrossed(individual, subpop.sampleIndividuals(1));
+}
+
+1 early() /* 🏁 */ {
+	// we remember all of the mutation objects that we generate, for output
+	defineGlobal("MUTS_CAUSAL", NULL);
+	defineGlobal("MUTS_NEUTRAL", NULL);
+	
+	// make the founder subpops
+	for (i in 1:N_founders)
+	{
+		size = asInteger(round(K1 / N_founders)); // stochastic: rpois(1, K1 / N_founders);
+		subpop = sim.addSubpop(i, size);
+		
+		// set up neutral variants, for the analysis stage
+		// these are in the middle of each analysis block, to impute ancestry
+		genomes = subpop.genomesNonNull;
+		positions = seq(asInteger(BLOCK/2), L-1, by=BLOCK);
+		muts = genomes.addNewDrawnMutation(m1, positions);
+		muts.tag = i;
+		
+		defineGlobal("MUTS_NEUTRAL", c(MUTS_NEUTRAL, muts));
+	}
+	
+	// add causal mutations to each clonal lineage
+	if (F)
+	{
+		// OLD CODE: add N_snps separate causal variants to each founder
+		for (i in 1:N_founders)
+		{
+			subpop = community.subpopulationsWithIDs(i);
+			genomes = subpop.genomesNonNull;
+			positions = rdunif(N_snps, 0, L-1);
+			muts = genomes.addNewDrawnMutation(m2, positions);
+			muts.setValue("FOUNDERS", i);
+			
+			defineGlobal("MUTS_CAUSAL", c(MUTS_CAUSAL, muts));
+		}
+	}
+	else
+	{
+		// NEW CODE: add N_snps*N_founders causal variants, each to
+		// some set of founders according to some basic expectation
+		total_snps = N_snps * N_founders;
+		
+		// draw unique positions, just to avoid having to think about stacking
+		positions = sample(0:(L-1), total_snps, replace=F);
+		
+		// neutral "Wright-Fisher" sampling distribution
+		WF_freq = (1/(1:17)) / sum(1/(1:17));
+		
+		for (position in positions)
+		{
+			count = sample(1:17, 1, weights=WF_freq);
+			founder_ids = sample(1:18, count, replace=F);
+			founders = community.subpopulationsWithIDs(founder_ids);
+			effect = rnorm(1, 0.0, 1.0 / count^EFFECTSCALER);		// rarer alleles get larger effects; note the m2 DFE is NOT USED
+			mut = founders.genomesNonNull.addNewMutation(m2, effect, position);
+			mut.setValue("FOUNDERS", founder_ids);
+			
+			defineGlobal("MUTS_CAUSAL", c(MUTS_CAUSAL, mut));
+			
+			catn("mut at " + position + " added to " + count + " founder" + (count > 1 ? "s" else "") + " (" + paste(founder_ids) + "), effect == " + effect);
+		}
+	}
+	
+	// print the initial summary of the founder subpops
+	for (i in 1:N_founders)
+	{
+		subpop = community.subpopulationsWithIDs(i);
+		size = subpop.individualCount;
+		snpcount = subpop.genomes[0].countOfMutationsOfType(m2);
+		catn("   founder " + i + ": " + size + " individuals, " + snpcount + " causal SNPs");
+	}
+	
+	// move everybody into one subpopulation
+	founders = sim.subpopulations;	
+	big_pop = sim.addSubpop(0, 0);
+	big_pop.takeMigrants(founders.individuals);
+	
+	// remove all the founders
+	founders.removeSubpopulation();
+	
+	// write out a file with information on all of the causal alleles
+	founderCounts = sapply(MUTS_CAUSAL, "size(applyValue.getValue('FOUNDERS'));");
+	founderStrings = sapply(MUTS_CAUSAL, "paste(applyValue.getValue('FOUNDERS'), sep=' ');");
+	mutInfo = DataFrame("id", MUTS_CAUSAL.id, "founder_count", founderCounts, "founders", founderStrings, "position", MUTS_CAUSAL.position, "effect", MUTS_CAUSAL.selectionCoeff);
+	writeFile("causal.csv", mutInfo.serialize("csv"));
+	
+	// write out a file with information on all of the neutral alleles
+	mutInfo = DataFrame("id", MUTS_NEUTRAL.id, "founder", MUTS_NEUTRAL.tag, "position", MUTS_NEUTRAL.position);
+	writeFile("neutral.csv", mutInfo.serialize("csv"));
+	
+	// start a file with a history of all of the causal alleles
+	mutHistoryHeader = paste("tick", MUTS_CAUSAL.id, sep=", ");
+	writeFile("causal_history.csv", mutHistoryHeader);
+	
+	// start a file with a history of all of the neutral alleles
+	mutHistoryHeader = paste("tick", MUTS_NEUTRAL.id, sep=", ");
+	writeFile("neutral_history.csv", mutHistoryHeader);
+	
+	// start a file with a history of population size, model stage, mean phenotype, fitness, etc.
+	writeFile("pop_history.csv", 'tick,stage,pop_prebottle_est,pop_size,phenotype_mean,phenotype_sd,fitness_mean,fitness_sd,V_A,OPTIMUM,SD_IN_SELECTION');
+	
+	// start a file where we dump windowed founder proportions; no header
+	writeFile("founder_history.csv", paste("tick", "stage", "start", 1:N_founders, sep=", "));
+}
+
+s10 early() /* 🚫💀 🚫🍾 */ {
+	// no bottleneck, no selection; used for burn-in, Monday, and Friday
+	
+	// non-overlapping generations: kill all the parents
+	inds = p0.individuals;
+	ages = inds.age;
+	parents = inds[ages > 0];
+	parents.fitnessScaling = 0.0;
+	
+	// phenotype evaluation: additive QTLs
+	juveniles = inds[ages == 0];
+	genotypes = juveniles.sumOfMutationsOfType(m2);
+	// total phenotype = genotype + 30* rnv as focus chromosome is 1/15th genome + heritability = 50%
+	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(30.0*var(genotypes)));
+	defineGlobal("O_PHENO", phenotypes);
+	
+	// fitness evaluation; note that fitness is not actually used in this stage
+	// optimum = 20 phenotypic deviations ... but you only need to get 1/15th of the way there due to other chromsomes
+	// variance in fitness = 20 * var(pheno)
+	defineGlobal("O_FIT", 0.0);
+
+	// no selection or bottleneck, expected size pre-bottleneck is actual size
+	defineGlobal("O_PREBOTTLE", juveniles.size());
+}
+
+s11 early() /* 🚫🍾 */ {
+	// selection, no bottleneck; used in all but the final generation of TuWTh
+	
+	// non-overlapping generations: kill all the parents
+	inds = p0.individuals;
+	ages = inds.age;
+	parents = inds[ages > 0];
+	parents.fitnessScaling = 0.0;
+	
+	// phenotype evaluation: additive QTLs
+	juveniles = inds[ages == 0];
+	genotypes = juveniles.sumOfMutationsOfType(m2);
+	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(15.0*var(genotypes)));
+	defineGlobal("O_PHENO", phenotypes);
+	//variance = var(phenotypes);
+	//catn(sim.generation + "Phenotypic variance: " + variance);
+	
+	// fitness evaluation: Gaussian fitness function applied to phenotypes
+	// the variance above is typically 200, so that's an sd == 14.1 or so
+	// we therefore use an optimum at 20.0 with an sd of ~141, variance 20000
+	fitness = dnorm(phenotypes, OPTIMUM, SD_IN_SELECTION) / dnorm(0.0, 0.0, SD_IN_SELECTION);
+	defineGlobal("O_FIT", fitness);
+	juveniles.fitnessScaling = fitness;
+	catn("   mean phenotype == " + mean(phenotypes));
+	catn("   mean fitness == " + mean(fitness));
+	
+	// no bottleneck, expected size pre-bottleneck is expected size post-fitness
+	expectedN = juveniles.size() * mean(fitness);
+	defineGlobal("O_PREBOTTLE", expectedN);
+}
+
+s12 early() /* K2🍾 */ {
+	// selection, bottleneck down to K2; used TuW
+	
+	// non-overlapping generations: kill all the parents
+	inds = p0.individuals;
+	ages = inds.age;
+	parents = inds[ages > 0];
+	parents.fitnessScaling = 0.0;
+	
+	// phenotype evaluation: additive QTLs
+	juveniles = inds[ages == 0];
+	genotypes = juveniles.sumOfMutationsOfType(m2);
+	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(15.0*var(genotypes)));
+	defineGlobal("O_PHENO", phenotypes);
+	
+	// fitness evaluation
+	fitness = dnorm(phenotypes, OPTIMUM, SD_IN_SELECTION) / dnorm(0.0, 0.0, SD_IN_SELECTION);
+	defineGlobal("O_FIT", fitness);
+	juveniles.fitnessScaling = fitness;
+	catn("   mean phenotype == " + mean(phenotypes));
+	catn("   mean fitness == " + mean(fitness));
+	
+	// bottleneck to K2
+	expectedN = juveniles.size() * mean(fitness);
+	defineGlobal("O_PREBOTTLE", expectedN);
+	catn("   expected pre-bottleneck size: " + expectedN);
+	desiredN = K2;
+	penalty = desiredN / expectedN;
+	juveniles.fitnessScaling = juveniles.fitnessScaling * penalty;
+}
+
+s13 early() /* K1🍾 */ {
+	// selection, bottleneck down to K1; used Th
+	
+	// non-overlapping generations: kill all the parents
+	inds = p0.individuals;
+	ages = inds.age;
+	parents = inds[ages > 0];
+	parents.fitnessScaling = 0.0;
+	
+	// phenotype evaluation: additive QTLs
+	juveniles = inds[ages == 0];
+	genotypes = juveniles.sumOfMutationsOfType(m2);
+	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(15.0*var(genotypes)));
+	defineGlobal("O_PHENO", phenotypes);
+	
+	// fitness evaluation
+	fitness = dnorm(phenotypes, OPTIMUM, SD_IN_SELECTION) / dnorm(0.0, 0.0, SD_IN_SELECTION);
+	defineGlobal("O_FIT", fitness);
+	juveniles.fitnessScaling = fitness;
+	catn("   mean phenotype == " + mean(phenotypes));
+	catn("   mean fitness == " + mean(fitness));
+	
+	// bottleneck to K1
+	expectedN = juveniles.size() * mean(fitness);
+	defineGlobal("O_PREBOTTLE", expectedN);
+	catn("   expected pre-bottleneck size: " + expectedN);
+	desiredN = K1;
+	penalty = desiredN / expectedN;
+	juveniles.fitnessScaling = juveniles.fitnessScaling * penalty;
+}
+
+late() /* 📝 */ {
+	catn("   final size: " + p0.individualCount);
+	
+	// write out a line to the causal mutation history log
+	freqs = sim.mutationFrequencies(NULL, MUTS_CAUSAL);
+	mutHistoryFreqs = paste(community.tick, freqs, sep=", ");
+	writeFile("causal_history.csv", mutHistoryFreqs, append=T);
+	
+	// write out a line to the causal mutation history log
+	freqs = sim.mutationFrequencies(NULL, MUTS_NEUTRAL);
+	mutHistoryFreqs = paste(community.tick, freqs, sep=", ");
+	writeFile("neutral_history.csv", mutHistoryFreqs, append=T);
+	
+	// write out a line to the population history log; some globals are expected to be set up with info for output
+	optimum = 1.0;
+	sd_in_selection = 1.0;
+	if (exists("OPTIMUM"))
+		optimum = OPTIMUM;
+	if (exists("SD_IN_SELECTION"))
+		sd_in_selection = SD_IN_SELECTION;
+	popHistoryLine = paste(community.tick, O_STAGE, O_PREBOTTLE, p0.individualCount, mean(O_PHENO), sd(O_PHENO), mean(O_FIT), sd(O_FIT), calcVA(p0.individuals, m2), optimum, sd_in_selection, sep=", ");
+	writeFile("pop_history.csv", popHistoryLine, append=T);
+	
+	// write out a block of windowed founder proportions; one line for each window, one column per founder
+	muts = sim.mutationsOfType(m1);	// use the neutral mutations only
+	pos = muts.position;
+	count = sim.mutationCounts(NULL, muts);
+	
+	windowLen = BLOCK;
+	windowOutput = NULL;
+	
+	for (windowStart in seq(0, L-1, by=windowLen))
+	{
+		windowLine = paste(community.tick, O_STAGE, windowStart, sep=", ");
+		windowEnd = windowStart + windowLen - 1;
+		inWindow = (pos >= windowStart) & (pos <= windowEnd);
+		windowMuts = muts[inWindow];
+		windowFounder = windowMuts.tag;
+		windowCount = count[inWindow];
+		totalWindowCount = sum(windowCount);
+		for (i in 1:N_founders)
+		{
+			thisFounder = (windowFounder == i);
+			founderMuts = windowMuts[thisFounder];
+			founderCount = windowCount[thisFounder];
+			founderFraction = sum(founderCount)/totalWindowCount;
+			windowLine = windowLine + ", " + format("%.3f", founderFraction);
+		}
+		windowOutput = c(windowOutput, windowLine);
+	}
+	defineGlobal("WINDOWED_FOUNDERS", windowOutput);
+	writeFile("founder_history.csv", windowOutput, append=T);
+	
+	// make sure stale output info doesn't get reused
+	rm(c("O_STAGE", "O_PREBOTTLE", "O_PHENO", "O_FIT"));
+}
+s100 late() /* 📝 */ {
+	// output windowed founder counts at specific times; this was generated above
+	catn("\nFOUNDER COUNTS BY 1 KB BLOCK:");
+	catn(paste(WINDOWED_FOUNDERS, sep="\n"));
+}
+s101 late() {
+	// set SEED2 at the end of burn-in
+	catn("SETTING SEED2: " + SEED2);
+	catn();
+	setSeed(SEED2);
+	juveniles = p0.individuals;
+	genotypes = juveniles.sumOfMutationsOfType(m2); // total phenotype = genotype + 30* rnv as focus chromosome is 1/15th genome + heritability = 50%
+	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(30.0*var(genotypes)));
+	optimum = 15.0*sqrt(var(phenotypes))/15.0;
+	sd_in_selection =  sqrt(5.0*var(phenotypes));
+	defineConstant("OPTIMUM",optimum);
+	defineConstant("SD_IN_SELECTION",sd_in_selection);
+	ss = sample(juveniles.genomes,12);  // 12 haploid genomes
+	for(genomes in ss){
+		muts = genomes.mutationsOfType(m1);
+		founder_ids = muts.tag;
+		writeFile("sample_haps_start.csv",paste(founder_ids,sep=","),append=T);
+		}
+}
+
+s200 late() {
+	juveniles = p0.individuals;
+	ss = sample(juveniles.genomes,12);  // 12 haploid genomes
+	for(genomes in ss){
+		muts = genomes.mutationsOfType(m1);
+		founder_ids = muts.tag;
+		writeFile("sample_haps_end.csv",paste(founder_ids,sep=","),append=T);
+		}
+}
+10000 late() { /* not reached */ }
+

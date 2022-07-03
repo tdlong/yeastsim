@@ -1,0 +1,41 @@
+## chrV SNPs
+cd /dfs7/adl/tdlong/RL_yeast/GATK_founders/gatk_work/
+module load vcftools/0.1.16
+vcftools --gzvcf founders.SNP.vcf.gz --chr chrV --remove-indels --recode --max-missing 1 --min-alleles 2 --max-alleles 2 -c >chrV.temp.vcf
+cat chrV.temp.vcf | grep -v "0/1:" | grep -v "1/0:" > chr5.granny.vcf
+cat chr5.granny.vcf | grep -v "^#" | wc -l
+#8477 SNPs total
+# note order is incorrect
+# A6_BC187_b	AB1b	AB2b	AB3b	AB4b	FA05	FA07	FA08	FA09	FA11	FA12	FB05	FB06	FB07	FB08	FB09	FB11	FB12
+
+
+## chrV fasta
+cd /dfs7/adl/tdlong/RL_yeast/ref/
+module load samtools/1.10 
+samtools faidx S288c.fasta chrV > S288c.chr5.fa
+
+## chrV BASE
+cd /dfs7/adl/tdlong/RL_yeast/SEXUAL
+zcat BAS02.haps.txt.gz | head -n 1
+#BAS02
+#chrI
+#32800
+#850
+#AB1;AB2;AB3;AB4;A5;A6;A7;A8;A9;A11;A12;B5;B7;B8;B9;B11;B12
+#1;2;3;4;5;6;7;8;9;10;10;11;12;13;14;10;2
+#14
+#3e-04;0.028;0.3531;0.0492;0.1337;0.146;3e-04;3e-04;0.003;0.0432;3e-04;0.167;0.003;0.068;0.004;3e-04;3e-04
+#3e-04;0.0141;0.3531;0.0492;0.1337;0.146;3e-04;3e-04;0.003;0.0146;0.0146;0.167;0.003;0.068;0.004;0.0146;0.0141
+
+zcat BAS02.haps.txt.gz | grep "chrV" | cut -f9 > chr5.BAS.temp.txt
+module load R
+R
+xx = read.table("chr5.BAS.temp.txt",header=FALSE,sep=";")
+apply(xx,2,mean)
+#AB1;AB2;AB3;AB4;A5;A6;A7;A8;A9;A11;A12;B5;B7;B8;B9;B11;B12
+mix=c(0.0150, 0.0033, 0.4003, 0.0300, 0.1356, 0.1568, 0.0027, 0.0081, 0.0058, 0.0130, 0.0179, 0.1238, 0.0106, 0.0498, 0.0079, 0.0133, 0.0059)
+# make order same as vcf
+# A6 is first, B6 has zero weight
+#A6;AB1;AB2;AB3;AB4;A5;A7;A8;A9;A11;A12;B5;B6;B7;B8;B9;B11;B12
+mix=c(0.1568, 0.0150, 0.0033, 0.4003, 0.0300, 0.1356, 0.0027, 0.0081, 0.0058, 0.0130, 0.0179, 0.1238, 0.0000, 0.0106, 0.0498, 0.0079, 0.0133, 0.0059)
+
