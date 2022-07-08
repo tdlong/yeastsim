@@ -7,9 +7,9 @@ initialize() {
 	if (!exists("SEED2"))
 		defineConstant("SEED2", 2);
 	if (!exists("N_snps"))
-		defineConstant("N_snps", 1800);		// total number of causal SNPs, from those in the VCF
+		defineConstant("N_snps", 180);		// total number of causal SNPs, from those in the VCF
 	if (!exists("SCALE"))
-		defineConstant("SCALE", 100);		// rescaling down of population sizes for speed, 100 is 1/100 default sizes
+		defineConstant("SCALE", 500);		// rescaling down of population sizes for speed, 100 is 1/100 default sizes
 	if (!exists("mydirIndicator"))
 		defineConstant("mydirIndicator",1);
 		
@@ -22,7 +22,7 @@ initialize() {
 	
 	defineConstant("WEEKS", 12);   //number of weeks to carry out selection experiment
 	defineConstant("N_founders", 18);	// number of founder lineages
-	defineConstant("K0", c(50,50,30,30,30,20,20,20,20,15,15,15,15,10,10,5,5,2));    // weight number of founders contributing to F1
+	defineConstant("K0", 250*c(0.1568, 0.0150, 0.0033, 0.4003, 0.0300, 0.1356, 0.0027, 0.0081, 0.0058, 0.0130, 0.0179, 0.1238, 0.0000, 0.0106, 0.0498, 0.0079, 0.0133, 0.0059));    // weight number of founders contributing to F1
 	defineConstant("K1", integerDiv(1e6, SCALE));	// carrying capacity 1, every Monday start
 	defineConstant("K2", integerDiv(1e7, SCALE));	// carrying capacity 2, every Tu/W/Th start
 	defineConstant("K3", integerDiv(1e9, SCALE));	// carrying capacity 3, every Tu/W/Th end
@@ -56,7 +56,7 @@ initialize() {
 	initializeGenomicElementType("g1", m1, 1.0);
 	initializeGenomicElement(g1, 0, L-1);
 	initializeMutationRate(0.0);
-	initializeRecombinationRate(4.0/L);		// 4 crossovers per haploid gamete
+	initializeRecombinationRate(2.0/L);		// 4 crossovers per haploid gamete
 }
 fitness(m2) { return 1.0; }
 
@@ -189,7 +189,7 @@ first() {
 	sim.addSubpop("p1000", 18);
 	founders = p1000.individuals;
 	founders.tag = 1:18;		// tag the founders by number
-	founders.genomes.readFromVCF("../../helperfiles/chr5.granny.vcf", mutationType=m3);
+	founders.genomes.readFromVCF("helperfiles/chr5.granny.vcf", mutationType=m3);
 	
 	// choose a subset of SNPs to be causal; change them to m2
 	all_snps = sim.mutationsOfType(m3);
@@ -221,7 +221,8 @@ first() {
 		containing_founders = founders[founders.containsMutations(mut)];
 		founder_ids = unique(containing_founders.tag, preserveOrder=F);
 		count = size(founder_ids);
-		effect = rnorm(1, 0.0, 1.0 / count^EFFECTSCALER);
+		mac = min(count, N_founders-count);   // use Minor allele counts to make effects
+		effect = rnorm(1, 0.0, 1.0 / mac^EFFECTSCALER);
 		
 		mut.setSelectionCoeff(effect);
 		mut.setValue("FOUNDERS", founder_ids);
@@ -235,7 +236,7 @@ first() {
 }
 1 reproduction() /* 🏁 */ {
 	// clone each founder individual into its founding subpop
-	size = K0[individual.tag - 1];
+	size = asInteger(round(K0[individual.tag - 1]));
 	founder_subpop = community.subpopulationsWithIDs(individual.tag);
 	
 	for (i in seqLen(size))
