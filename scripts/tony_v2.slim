@@ -7,7 +7,7 @@ initialize() {
 	if (!exists("SEED2"))
 		defineConstant("SEED2", 2);
 	if (!exists("N_snps"))
-		defineConstant("N_snps", 100);		// number of causal SNPs per lineage, initially  with new code seems to be N_snps * N_founders total mutations
+		defineConstant("N_snps", 1800);		// total number of causal SNPs, from those in the VCF
 	if (!exists("SCALE"))
 		defineConstant("SCALE", 100);		// rescaling down of population sizes for speed, 100 is 1/100 default sizes
 	if (!exists("mydirIndicator"))
@@ -28,7 +28,7 @@ initialize() {
 	defineConstant("K3", integerDiv(1e9, SCALE));	// carrying capacity 3, every Tu/W/Th end
 	defineConstant("F1", (K2/K1)^(1/5)); // mean fecundity on Mondays; K1 to K2 in 5 generations
 	defineConstant("F2", (K3/K2)^(1/10)); // mean fecundity on TuWTh; K2 to K3 in 10 generations
-	defineConstant("L", 500e3);            // chromosome length in basepair
+	defineConstant("L", 577000);            // chromosome length in basepair; 576874 for chrV in the VCF
 	defineConstant("EFFECTSCALER", 2.0);            // effect sizes are scaled by 1/freq^EFFECTSCALER ... bigger numbers make common alleles less important
 
 	defineConstant("BLOCK", 1000);			//size of blocks marked with founder allele
@@ -48,7 +48,10 @@ initialize() {
 	
 	// m2 is additive QTLs determining phenotype
 	initializeMutationType("m2", 0.0, "n", 0.0, 1.0);
-	m2.haploidDominanceCoeff = 0.0;	// not used
+	
+	// m3 is SNPs read from VCF that are decided to be non-causal
+	initializeMutationType("m3", 0.5, "f", 0.0);
+	m3.color = "#444444";
 	
 	initializeGenomicElementType("g1", m1, 1.0);
 	initializeGenomicElement(g1, 0, L-1);
@@ -181,6 +184,64 @@ first() {
 	}
 }
 
+1 first() /* 🏁 */ {
+	// read in the VCF data to start
+	sim.addSubpop("p1000", 18);
+	founders = p1000.individuals;
+	founders.tag = 1:18;		// tag the founders by number
+	founders.genomes.readFromVCF("../../helperfiles/chr5.granny.vcf", mutationType=m3);
+	
+	// choose a subset of SNPs to be causal; change them to m2
+	all_snps = sim.mutationsOfType(m3);
+	causal_snps = sample(all_snps, N_snps, replace=F);
+	causal_snps.setMutationType(m2);
+	catn(size(all_snps) + " SNPs read from VCF; " + size(causal_snps) + " made causal.");
+	
+	// we remember all of the mutation objects that we generate, for output
+	defineGlobal("MUTS_CAUSAL", causal_snps);
+	defineGlobal("MUTS_NEUTRAL", NULL);
+	
+	for (i in 1:N_founders)
+	{
+		// set up neutral variants, for the analysis stage
+		// these are in the middle of each analysis block, to impute ancestry
+		genomes = founders[i - 1].genomes;
+		positions = seq(asInteger(BLOCK/2), L-1, by=BLOCK);
+		muts = genomes.addNewDrawnMutation(m1, positions);
+		muts.tag = i;
+		
+		defineGlobal("MUTS_NEUTRAL", c(MUTS_NEUTRAL, muts));
+	}
+	
+	// assign effects to the causal mutations based on their frequency
+	// rarer alleles get larger effects; note the m2 DFE is NOT USED
+	for (causal_index in seqAlong(MUTS_CAUSAL))
+	{
+		mut = MUTS_CAUSAL[causal_index];
+		containing_founders = founders[founders.containsMutations(mut)];
+		founder_ids = unique(containing_founders.tag, preserveOrder=F);
+		count = size(founder_ids);
+		effect = rnorm(1, 0.0, 1.0 / count^EFFECTSCALER);
+		
+		mut.setSelectionCoeff(effect);
+		mut.setValue("FOUNDERS", founder_ids);
+		
+		catn("mut at " + mut.position + " added to " + count + " founder" + (count > 1 ? "s" else "") + " (" + paste(founder_ids) + "), effect == " + effect);
+	}
+	
+	// make the founder subpops, which start empty
+	for (i in 1:N_founders)
+		sim.addSubpop(i, 0);
+}
+1 reproduction() /* 🏁 */ {
+	// clone each founder individual into its founding subpop
+	size = K0[individual.tag - 1];
+	founder_subpop = community.subpopulationsWithIDs(individual.tag);
+	
+	for (i in seqLen(size))
+		founder_subpop.addCloned(individual);
+}
+
 s0 reproduction() /* 🔥👶 */ {
 	// sexual reproduction, exactly 1 offspring per parent
 	// for the burn-in; maintain constant population size
@@ -217,67 +278,8 @@ s3 reproduction() /* F👶 */ {
 }
 
 1 early() /* 🏁 */ {
-	// we remember all of the mutation objects that we generate, for output
-	defineGlobal("MUTS_CAUSAL", NULL);
-	defineGlobal("MUTS_NEUTRAL", NULL);
-	
-	// make the founder subpops
-	for (i in 1:N_founders)
-	{
-		size = asInteger(round(K1 / N_founders)); // stochastic: rpois(1, K1 / N_founders);
-		subpop = sim.addSubpop(i, size);
-		
-		// set up neutral variants, for the analysis stage
-		// these are in the middle of each analysis block, to impute ancestry
-		genomes = subpop.genomesNonNull;
-		positions = seq(asInteger(BLOCK/2), L-1, by=BLOCK);
-		muts = genomes.addNewDrawnMutation(m1, positions);
-		muts.tag = i;
-		
-		defineGlobal("MUTS_NEUTRAL", c(MUTS_NEUTRAL, muts));
-	}
-	
-	// add causal mutations to each clonal lineage
-	if (F)
-	{
-		// OLD CODE: add N_snps separate causal variants to each founder
-		for (i in 1:N_founders)
-		{
-			subpop = community.subpopulationsWithIDs(i);
-			genomes = subpop.genomesNonNull;
-			positions = rdunif(N_snps, 0, L-1);
-			muts = genomes.addNewDrawnMutation(m2, positions);
-			muts.setValue("FOUNDERS", i);
-			
-			defineGlobal("MUTS_CAUSAL", c(MUTS_CAUSAL, muts));
-		}
-	}
-	else
-	{
-		// NEW CODE: add N_snps*N_founders causal variants, each to
-		// some set of founders according to some basic expectation
-		total_snps = N_snps * N_founders;
-		
-		// draw unique positions, just to avoid having to think about stacking
-		positions = sample(0:(L-1), total_snps, replace=F);
-		
-		// neutral "Wright-Fisher" sampling distribution
-		WF_freq = (1/(1:17)) / sum(1/(1:17));
-		
-		for (position in positions)
-		{
-			count = sample(1:17, 1, weights=WF_freq);
-			founder_ids = sample(1:18, count, replace=F);
-			founders = community.subpopulationsWithIDs(founder_ids);
-			effect = rnorm(1, 0.0, 1.0 / count^EFFECTSCALER);		// rarer alleles get larger effects; note the m2 DFE is NOT USED
-			mut = founders.genomesNonNull.addNewMutation(m2, effect, position);
-			mut.setValue("FOUNDERS", founder_ids);
-			
-			defineGlobal("MUTS_CAUSAL", c(MUTS_CAUSAL, mut));
-			
-			catn("mut at " + position + " added to " + count + " founder" + (count > 1 ? "s" else "") + " (" + paste(founder_ids) + "), effect == " + effect);
-		}
-	}
+	// remove the initial VCF subpop, which we have already cloned up
+	p1000.removeSubpopulation();
 	
 	// print the initial summary of the founder subpops
 	for (i in 1:N_founders)
