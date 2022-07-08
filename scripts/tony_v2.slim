@@ -189,7 +189,7 @@ first() {
 	sim.addSubpop("p1000", 18);
 	founders = p1000.individuals;
 	founders.tag = 1:18;		// tag the founders by number
-	founders.genomes.readFromVCF("helperfiles/chr5.granny.vcf", mutationType=m3);
+	founders.genomes.readFromVCF("/dfs7/adl/tdlong/slim/yeastsim/helperfiles/chr5.granny.vcf", mutationType=m3);
 	
 	// choose a subset of SNPs to be causal; change them to m2
 	all_snps = sim.mutationsOfType(m3);
@@ -221,7 +221,7 @@ first() {
 		containing_founders = founders[founders.containsMutations(mut)];
 		founder_ids = unique(containing_founders.tag, preserveOrder=F);
 		count = size(founder_ids);
-		mac = min(count, N_founders-count);   // use Minor allele counts to make effects
+		mac = max(1,min(count, N_founders-count));   // use Minor allele counts to make effects
 		effect = rnorm(1, 0.0, 1.0 / mac^EFFECTSCALER);
 		
 		mut.setSelectionCoeff(effect);
@@ -287,8 +287,11 @@ s3 reproduction() /* F👶 */ {
 	{
 		subpop = community.subpopulationsWithIDs(i);
 		size = subpop.individualCount;
-		snpcount = subpop.genomes[0].countOfMutationsOfType(m2);
-		catn("   founder " + i + ": " + size + " individuals, " + snpcount + " causal SNPs");
+		if(size >= 1)
+			{
+			snpcount = subpop.genomes[0].countOfMutationsOfType(m2);
+			catn("   founder " + i + ": " + size + " individuals, " + snpcount + " causal SNPs");
+			}
 	}
 	
 	// move everybody into one subpopulation
