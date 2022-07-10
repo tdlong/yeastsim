@@ -321,7 +321,7 @@ s3 reproduction() /* F👶 */ {
 	writeFile("neutral_history.csv", mutHistoryHeader);
 	
 	// start a file with a history of population size, model stage, mean phenotype, fitness, etc.
-	writeFile("pop_history.csv", 'tick,stage,pop_prebottle_est,pop_size,phenotype_mean,phenotype_sd,fitness_mean,fitness_sd,V_A,OPTIMUM,SD_IN_SELECTION');
+	writeFile("pop_history.csv", 'tick,stage,pop_prebottle_est,pop_size,phenotype_mean,phenotype_sd,fitness_mean,V_A,OPTIMUM,SD_IN_SELECTION');
 	
 	// start a file where we dump windowed founder proportions; no header
 	writeFile("founder_history.csv", paste("tick", "stage", "start", 1:N_founders, sep=", "));
@@ -465,7 +465,7 @@ late() /* 📝 */ {
 		optimum = OPTIMUM;
 	if (exists("SD_IN_SELECTION"))
 		sd_in_selection = SD_IN_SELECTION;
-	popHistoryLine = paste(community.tick, O_STAGE, O_PREBOTTLE, p0.individualCount, mean(O_PHENO), sd(O_PHENO), mean(O_FIT), sd(O_FIT), calcVA(p0.individuals, m2), optimum, sd_in_selection, sep=", ");
+	popHistoryLine = paste(community.tick, O_STAGE, O_PREBOTTLE, p0.individualCount, mean(O_PHENO), sd(O_PHENO), mean(O_FIT), calcVA(p0.individuals, m2), optimum, sd_in_selection, sep=", ");
 	writeFile("pop_history.csv", popHistoryLine, append=T);
 	
 	// write out a block of windowed founder proportions; one line for each window, one column per founder
