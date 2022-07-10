@@ -56,7 +56,7 @@ initialize() {
 	initializeGenomicElementType("g1", m1, 1.0);
 	initializeGenomicElement(g1, 0, L-1);
 	initializeMutationRate(0.0);
-	initializeRecombinationRate(2.0/L);		// 4 crossovers per haploid gamete
+	initializeRecombinationRate(3.0/L);		// 3 crossovers per haploid gamete
 }
 fitness(m2) { return 1.0; }
 
@@ -215,6 +215,7 @@ first() {
 	
 	// assign effects to the causal mutations based on their frequency
 	// rarer alleles get larger effects; note the m2 DFE is NOT USED
+	SUMOFEFFECTS = 0.0;
 	for (causal_index in seqAlong(MUTS_CAUSAL))
 	{
 		mut = MUTS_CAUSAL[causal_index];
@@ -223,12 +224,14 @@ first() {
 		count = size(founder_ids);
 		mac = max(1,min(count, N_founders-count));   // use Minor allele counts to make effects
 		effect = rnorm(1, 0.0, 1.0 / mac^EFFECTSCALER);
+		SUMOFEFFECTS = SUMOFEFFECTS + effect;
 		
 		mut.setSelectionCoeff(effect);
 		mut.setValue("FOUNDERS", founder_ids);
 		
 		catn("mut at " + mut.position + " added to " + count + " founder" + (count > 1 ? "s" else "") + " (" + paste(founder_ids) + "), effect == " + effect);
 	}
+	defineGlobal("SUMOFEFFECTS", SUMOFEFFECTS);
 	
 	// make the founder subpops, which start empty
 	for (i in 1:N_founders)
@@ -339,8 +342,9 @@ s10 early() /* 🚫💀 🚫🍾 */ {
 	// phenotype evaluation: additive QTLs
 	juveniles = inds[ages == 0];
 	genotypes = juveniles.sumOfMutationsOfType(m2);
+	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	// total phenotype = genotype + 30* rnv as focus chromosome is 1/15th genome + heritability = 50%
-	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(30.0*var(genotypes)));
 	defineGlobal("O_PHENO", phenotypes);
 	
 	// fitness evaluation; note that fitness is not actually used in this stage
@@ -364,7 +368,8 @@ s11 early() /* 🚫🍾 */ {
 	// phenotype evaluation: additive QTLs
 	juveniles = inds[ages == 0];
 	genotypes = juveniles.sumOfMutationsOfType(m2);
-	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(15.0*var(genotypes)));
+	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	defineGlobal("O_PHENO", phenotypes);
 	//variance = var(phenotypes);
 	//catn(sim.generation + "Phenotypic variance: " + variance);
@@ -395,7 +400,8 @@ s12 early() /* K2🍾 */ {
 	// phenotype evaluation: additive QTLs
 	juveniles = inds[ages == 0];
 	genotypes = juveniles.sumOfMutationsOfType(m2);
-	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(15.0*var(genotypes)));
+	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	defineGlobal("O_PHENO", phenotypes);
 	
 	// fitness evaluation
@@ -426,7 +432,8 @@ s13 early() /* K1🍾 */ {
 	// phenotype evaluation: additive QTLs
 	juveniles = inds[ages == 0];
 	genotypes = juveniles.sumOfMutationsOfType(m2);
-	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(15.0*var(genotypes)));
+	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	defineGlobal("O_PHENO", phenotypes);
 	
 	// fitness evaluation
@@ -513,7 +520,8 @@ s101 late() {
 	setSeed(SEED2);
 	juveniles = p0.individuals;
 	genotypes = juveniles.sumOfMutationsOfType(m2); // total phenotype = genotype + 30* rnv as focus chromosome is 1/15th genome + heritability = 50%
-	phenotypes = genotypes + rnorm(length(genotypes),0,sqrt(30.0*var(genotypes)));
+	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	optimum = 15.0*sqrt(var(phenotypes))/15.0;
 	sd_in_selection =  sqrt(5.0*var(phenotypes));
 	defineConstant("OPTIMUM",optimum);
