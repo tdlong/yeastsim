@@ -14,8 +14,10 @@ for(i in 1:6){
 	}
 df$lps = log(df$pop_size,base=10)
 df$i = as.factor(df$i)
+## this really has to be divided by (df$OPTIMUM - df$phenotype_mean at time zero)
+## I just have to define what tick I am talking about and do something more sophisticated
 df$percentToOptima = 100*df$phenotype_mean/df$OPTIMUM
-df$relativeVA = (30*10*df$V_A)/(df$SD_IN_SELECTION^2)     # since Vp = Vg + rnorm(30*Vg) and Vs = 10*Vp
+df$relativeVA = (30*5*df$V_A)/(df$SD_IN_SELECTION^2)     # since Vp = Vg + rnorm(30*Vg) and Vs = 10*Vp
 
 	
 msize = ggplot(df %>% filter(i==1),aes(x=tick,y=lps, group=i, colour=i)) +
