@@ -6,17 +6,17 @@ for(i in 1:6){
 	filename = paste0("runs/run_",i,"/pop_history.csv")
 	pop_hist = read.csv(filename, header=T)
 	pop_hist$i = rep(i,nrow(pop_hist))
+	pop_hist$lps = log(pop_hist$pop_size,base=10)
+	## this really has to be divided by (df$OPTIMUM - df$phenotype_mean at time zero)
+	## I just have to define what tick I am talking about and do something more sophisticated
+	pop_hist$percentToOptima = 100*pop_hist$phenotype_mean/(pop_hist$OPTIMUM-pop_hist$phenotype_mean[pop_hist$tick==13])
 	if(i == 1){
 		df=pop_hist
 		}else{
 		df=rbind(df,pop_hist)
 		}
 	}
-df$lps = log(df$pop_size,base=10)
 df$i = as.factor(df$i)
-## this really has to be divided by (df$OPTIMUM - df$phenotype_mean at time zero)
-## I just have to define what tick I am talking about and do something more sophisticated
-df$percentToOptima = 100*df$phenotype_mean/df$OPTIMUM
 df$relativeVA = (30*5*df$V_A)/(df$SD_IN_SELECTION^2)     # since Vp = Vg + rnorm(30*Vg) and Vs = 10*Vp
 
 	

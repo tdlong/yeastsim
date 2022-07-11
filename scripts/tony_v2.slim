@@ -342,7 +342,7 @@ s10 early() /* 🚫💀 🚫🍾 */ {
 	// phenotype evaluation: additive QTLs
 	juveniles = inds[ages == 0];
 	genotypes = juveniles.sumOfMutationsOfType(m2);
-	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	GenoValue = genotypes - SUMOFEFFECTS;	
 	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	// total phenotype = genotype + 30* rnv as focus chromosome is 1/15th genome + heritability = 50%
 	defineGlobal("O_PHENO", phenotypes);
@@ -368,7 +368,7 @@ s11 early() /* 🚫🍾 */ {
 	// phenotype evaluation: additive QTLs
 	juveniles = inds[ages == 0];
 	genotypes = juveniles.sumOfMutationsOfType(m2);
-	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	GenoValue = genotypes - SUMOFEFFECTS;	
 	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	defineGlobal("O_PHENO", phenotypes);
 	//variance = var(phenotypes);
@@ -400,7 +400,7 @@ s12 early() /* K2🍾 */ {
 	// phenotype evaluation: additive QTLs
 	juveniles = inds[ages == 0];
 	genotypes = juveniles.sumOfMutationsOfType(m2);
-	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	GenoValue = genotypes - SUMOFEFFECTS;	
 	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	defineGlobal("O_PHENO", phenotypes);
 	
@@ -432,7 +432,7 @@ s13 early() /* K1🍾 */ {
 	// phenotype evaluation: additive QTLs
 	juveniles = inds[ages == 0];
 	genotypes = juveniles.sumOfMutationsOfType(m2);
-	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	GenoValue = genotypes - SUMOFEFFECTS;	
 	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	defineGlobal("O_PHENO", phenotypes);
 	
