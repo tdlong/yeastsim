@@ -520,9 +520,9 @@ s101 late() {
 	setSeed(SEED2);
 	juveniles = p0.individuals;
 	genotypes = juveniles.sumOfMutationsOfType(m2); // total phenotype = genotype + 30* rnv as focus chromosome is 1/15th genome + heritability = 50%
-	GenoValue = 2*genotypes - SUMOFEFFECTS;	
+	GenoValue = genotypes - SUMOFEFFECTS;	
 	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
-	optimum = mean(phenotypes) + 15.0*sqrt(var(phenotypes))/15.0;
+	optimum = mean(phenotypes) + 7.0*sqrt(var(phenotypes))/15.0;
 	sd_in_selection =  sqrt(5.0*var(phenotypes));
 	defineConstant("OPTIMUM",optimum);
 	defineConstant("SD_IN_SELECTION",sd_in_selection);
