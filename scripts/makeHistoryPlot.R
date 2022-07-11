@@ -9,7 +9,7 @@ for(i in 1:6){
 	pop_hist$lps = log(pop_hist$pop_size,base=10)
 	## this really has to be divided by (df$OPTIMUM - df$phenotype_mean at time zero)
 	## I just have to define what tick I am talking about and do something more sophisticated
-	pop_hist$percentToOptima = 100*pop_hist$phenotype_mean/(pop_hist$OPTIMUM-pop_hist$phenotype_mean[pop_hist$tick==13])
+	pop_hist$percentToOptima = 100*(pop_hist$phenotype_mean-pop_hist$phenotype_mean[pop_hist$tick==13])/(pop_hist$OPTIMUM-pop_hist$phenotype_mean[pop_hist$tick==13])
 	if(i == 1){
 		df=pop_hist
 		}else{
@@ -39,7 +39,7 @@ Va = ggplot(df2,aes(x=tick,y=relativeVA, group=i, colour=i)) +
 	geom_line() +
 	scale_color_manual(values=c("red","red","blue","blue","green","green")) +
 	xlab("time") +
-	ggtitle("additive genetic variance relative to base") +
+	ggtitle("Va / var(selection)") +
 	ylab("Va")
 	
 
