@@ -15,9 +15,14 @@ for(i in startIndex:stopIndex){
 	m = founder_hist[founder_hist$tick == 445,]
 	start = as.numeric(unlist(m["start"]))
 	m = as.matrix(m[,1:18 + 3])
+# earlier timepoint
+	mear = founder_hist[founder_hist$tick == 193,]
+	mear = as.matrix(m[,1:18 + 3])
+# change in frequency	
 	mstart = founder_hist[founder_hist$tick == 13,]
 	mstart = as.matrix(mstart[,1:18 + 3])	
 	m2 = m-mstart
+	m2ear = mear - mstart
 
 	if(i==startIndex){
 		par(mar=c(3.5, 3.5, 1, 1), family="serif", mgp=c(2.1, 0.6, 0))
@@ -27,9 +32,17 @@ for(i in startIndex:stopIndex){
 	maxPerWindow = as.integer(apply(m2, MARGIN=1, FUN=which.max))
 	topFreq = sapply(1:NROW(m2), FUN=function(window) { m2[window, maxPerWindow[window]] })
 	topColor = sapply(1:NROW(m2), FUN=function(window) { founder_color [maxPerWindow[window]] })
-
-	points(start, topFreq, col=topColor, pch=19, cex=0.5)
+	points(start, topFreq, col=topColor, pch=19, cex=0.25)
 	lines(start, topFreq, col="lightgrey", lwd=0.25)
+	
+# earlier time point
+	maxPerWindow = as.integer(apply(m2ear, MARGIN=1, FUN=which.max))
+	topFreq = sapply(1:NROW(m2ear), FUN=function(window) { m2ear[window, maxPerWindow[window]] })
+	topColor = sapply(1:NROW(m2ear), FUN=function(window) { founder_color [maxPerWindow[window]] })
+
+	points(start, topFreq, col=topColor, pch=19, cex=0.10)
+	lines(start, topFreq, col="lightgrey", lwd=0.15)
+	
 	}
 graphics.off()
 
