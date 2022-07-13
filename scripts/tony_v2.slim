@@ -23,13 +23,13 @@ initialize() {
 	defineConstant("WEEKS", 12);   //number of weeks to carry out selection experiment
 	defineConstant("N_founders", 18);	// number of founder lineages
 	defineConstant("K0", 250*c(0.1568, 0.0150, 0.0033, 0.4003, 0.0300, 0.1356, 0.0027, 0.0081, 0.0058, 0.0130, 0.0179, 0.1238, 0.0000, 0.0106, 0.0498, 0.0079, 0.0133, 0.0059));    // weight number of founders contributing to F1
-	defineConstant("K1", integerDiv(1e6, SCALE));	// carrying capacity 1, every Monday start
+	defineConstant("K1", integerDiv(1e5, SCALE));	// carrying capacity 1, every Monday start
 	defineConstant("K2", integerDiv(1e7, SCALE));	// carrying capacity 2, every Tu/W/Th start
 	defineConstant("K3", integerDiv(1e9, SCALE));	// carrying capacity 3, every Tu/W/Th end
 	defineConstant("F1", (K2/K1)^(1/5)); // mean fecundity on Mondays; K1 to K2 in 5 generations
 	defineConstant("F2", (K3/K2)^(1/10)); // mean fecundity on TuWTh; K2 to K3 in 10 generations
 	defineConstant("L", 577000);            // chromosome length in basepair; 576874 for chrV in the VCF
-	defineConstant("EFFECTSCALER", 2.0);            // effect sizes are scaled by 1/freq^EFFECTSCALER ... bigger numbers make common alleles less important
+	defineConstant("EFFECTSCALER", 1.5);  //EFFECTSCALER ... bigger numbers make common alleles less important
 
 	defineConstant("BLOCK", 1000);			//size of blocks marked with founder allele
 
@@ -523,7 +523,7 @@ s101 late() {
 	GenoValue = genotypes - SUMOFEFFECTS;	
 	phenotypes = GenoValue + rnorm(length(GenoValue),0,sqrt(30.0*var(GenoValue)));
 	optimum = mean(phenotypes) + 7.0*sqrt(var(phenotypes))/15.0;
-	sd_in_selection =  sqrt(5.0*var(phenotypes));
+	sd_in_selection =  sqrt(2.0*var(phenotypes));
 	defineConstant("OPTIMUM",optimum);
 	defineConstant("SD_IN_SELECTION",sd_in_selection);
 	ss = sample(juveniles.genomes,12);  // 12 haploid genomes
